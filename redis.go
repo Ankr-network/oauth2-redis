@@ -26,7 +26,7 @@ func NewRedisStore(opts *redis.Options, keyNamespace ...string) *TokenStore {
 	return NewRedisStoreWithCli(redis.NewClient(opts), keyNamespace...)
 }
 
-// NewRedisStoreWithCli create an instance of a redis store
+// NewRedisStoreWithCli create an instance of a redis store by exists redis client
 func NewRedisStoreWithCli(cli *redis.Client, keyNamespace ...string) *TokenStore {
 	store := &TokenStore{
 		cli: cli,
@@ -39,6 +39,22 @@ func NewRedisStoreWithCli(cli *redis.Client, keyNamespace ...string) *TokenStore
 	}
 	store.bl = auth.NewRedisBlacklist(cli, auth.WithPrefix(blPrefix))
 	return store
+}
+
+// NewBlackListRedisStore create an instance of a redis store by exists blacklist
+func NewBlackListRedisStore(opts *redis.Options, bl auth.Blacklist) *TokenStore {
+	if opts == nil {
+		panic("options cannot be nil")
+	}
+	return NewBlackListRedisStoreWithCli(redis.NewClient(opts), bl)
+}
+
+// NewBlackListRedisStoreWithCli create an instance of a redis store by exists redis client and blacklist
+func NewBlackListRedisStoreWithCli(cli *redis.Client, bl auth.Blacklist) *TokenStore {
+	return &TokenStore{
+		cli: cli,
+		bl:  bl,
+	}
 }
 
 // NewRedisClusterStore create an instance of a redis cluster store
