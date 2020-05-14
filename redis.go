@@ -6,79 +6,53 @@ import (
 
 	"github.com/Ankr-network/kit/auth"
 	"github.com/go-redis/redis"
-	jsoniter "github.com/json-iterator/go"
+	jsonIter "github.com/json-iterator/go"
 	"gopkg.in/oauth2.v3"
 	"gopkg.in/oauth2.v3/models"
 	"gopkg.in/oauth2.v3/utils/uuid"
 )
 
 var (
-	_             oauth2.TokenStore = &TokenStore{}
-	jsonMarshal                     = jsoniter.Marshal
-	jsonUnmarshal                   = jsoniter.Unmarshal
+	jsonMarshal   = jsonIter.Marshal
+	jsonUnmarshal = jsonIter.Unmarshal
 )
 
-// NewRedisStore create an instance of a redis store
-func NewRedisStore(opts *redis.Options, keyNamespace ...string) *TokenStore {
-	if opts == nil {
-		panic("options cannot be nil")
-	}
-	return NewRedisStoreWithCli(redis.NewClient(opts), keyNamespace...)
+type Options struct {
+	KeyNamespace string
+	Blacklist    auth.Blacklist
 }
 
-// NewRedisStoreWithCli create an instance of a redis store by exists redis client
-func NewRedisStoreWithCli(cli *redis.Client, keyNamespace ...string) *TokenStore {
-	store := &TokenStore{
-		cli: cli,
-	}
+type Option func(opts *Options)
 
-	blPrefix := "blacklist:"
-	if len(keyNamespace) > 0 {
-		store.ns = keyNamespace[0]
-		blPrefix = fmt.Sprintf("%sblacklist:", store.ns)
+func WithKeyNamespace(ns string) Option {
+	return func(opts *Options) {
+		opts.KeyNamespace = ns
 	}
-	store.bl = auth.NewRedisBlacklist(cli, auth.WithPrefix(blPrefix))
-	return store
 }
 
-// NewBlackListRedisStore create an instance of a redis store by exists blacklist
-func NewBlackListRedisStore(opts *redis.Options, bl auth.Blacklist) *TokenStore {
-	if opts == nil {
-		panic("options cannot be nil")
+func WithBlacklist(bl auth.Blacklist) Option {
+	return func(opts *Options) {
+		opts.Blacklist = bl
 	}
-	return NewBlackListRedisStoreWithCli(redis.NewClient(opts), bl)
 }
 
-// NewBlackListRedisStoreWithCli create an instance of a redis store by exists redis client and blacklist
-func NewBlackListRedisStoreWithCli(cli *redis.Client, bl auth.Blacklist) *TokenStore {
+// NewRedisTokenStore create an instance of a redis store with a redis client
+func NewRedisTokenStore(cli Client, opts ...Option) *TokenStore {
+	cfg := &Options{
+		KeyNamespace: "token:",
+	}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	if cfg.Blacklist == nil {
+		cfg.Blacklist = auth.NewRedisBlacklist(cli, auth.WithPrefix(cfg.KeyNamespace+"blacklist:"))
+	}
+
 	return &TokenStore{
 		cli: cli,
-		bl:  bl,
+		ns:  cfg.KeyNamespace,
+		bl:  cfg.Blacklist,
 	}
-}
-
-// NewRedisClusterStore create an instance of a redis cluster store
-func NewRedisClusterStore(opts *redis.ClusterOptions, keyNamespace ...string) *TokenStore {
-	if opts == nil {
-		panic("options cannot be nil")
-	}
-	return NewRedisClusterStoreWithCli(redis.NewClusterClient(opts), keyNamespace...)
-}
-
-// NewRedisClusterStoreWithCli create an instance of a redis cluster store
-func NewRedisClusterStoreWithCli(cli *redis.ClusterClient, keyNamespace ...string) *TokenStore {
-	store := &TokenStore{
-		cli: cli,
-	}
-
-	blPrefix := "blacklist:"
-	if len(keyNamespace) > 0 {
-		store.ns = keyNamespace[0]
-		blPrefix = fmt.Sprintf("%sblacklist:", store.ns)
-	}
-	store.bl = auth.NewRedisBlacklist(cli, auth.WithPrefix(blPrefix))
-
-	return store
 }
 
 type ExtendedTokenStore interface {
@@ -88,14 +62,14 @@ type ExtendedTokenStore interface {
 	oauth2.TokenStore
 }
 
-type clienter interface {
+type Client interface {
 	redis.Cmdable
 	Close() error
 }
 
 // TokenStore redis token store
 type TokenStore struct {
-	cli clienter
+	cli Client
 	ns  string
 	bl  auth.Blacklist
 }

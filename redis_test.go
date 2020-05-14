@@ -22,7 +22,7 @@ func TestTokenStore(t *testing.T) {
 			Addr: addr,
 			DB:   db,
 		}
-		store := NewRedisStore(opts)
+		store := NewRedisTokenStore(redis.NewClient(opts))
 
 		Convey("Test authorization code store", func() {
 			info := &models.Token{
@@ -196,7 +196,7 @@ func TestTokenStoreWithKeyNamespace(t *testing.T) {
 			Addr: addr,
 			DB:   db,
 		}
-		store := NewRedisStore(opts, "test:")
+		store := NewRedisTokenStore(redis.NewClient(opts), WithKeyNamespace("test:"))
 
 		Convey("Test authorization code store", func() {
 			info := &models.Token{
